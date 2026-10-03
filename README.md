@@ -7,15 +7,50 @@ CodeMirror editor (TypeScript completions), and an MCP endpoint for agents.
 
 ![Pluto notebook: a Polars DataFrame grouped by department, rendered as a table](assets/screenshot.jpeg)
 
-## Run
+## Install
 
-Download a binary from [Releases](../../releases), or build one (below), then:
+Pick the file for your machine from the [latest release](https://github.com/Junkiez/pluto/releases/latest):
+
+| Platform | File |
+|---|---|
+| macOS, Apple Silicon (M1+) | `pluto-darwin-arm64.tar.gz` |
+| macOS, Intel | `pluto-darwin-x64.tar.gz` |
+| Linux x64 | `pluto-linux-x64.tar.gz` |
+| Linux ARM64 | `pluto-linux-arm64.tar.gz` |
+| Windows x64 | `pluto-win32-x64.zip` |
+
+**macOS / Linux** — download, unpack and put it on your `PATH` (swap in your platform's file name):
 
 ```bash
-./pluto --file example/getting-started.json
+curl -L https://github.com/Junkiez/pluto/releases/latest/download/pluto-darwin-arm64.tar.gz | tar -xz
+sudo mv pluto /usr/local/bin/
 ```
 
-Open http://localhost:9999.
+> **macOS: "cannot be opened because the developer cannot be verified"** — the binary isn't signed by Apple, and
+> files downloaded through a browser get quarantined. `curl` (above) avoids it; otherwise clear the flag once:
+> `xattr -d com.apple.quarantine /usr/local/bin/pluto`
+
+**Windows** — unzip `pluto-win32-x64.zip` and run `pluto.exe` from a terminal. SmartScreen may warn about an
+unrecognized app: *More info → Run anyway*.
+
+**Docker** — multi-arch image (amd64/arm64) on GitHub Packages:
+
+```bash
+docker run -p 9999:9999 -v pluto-data:/data -e PLUTO_PASS=secret ghcr.io/junkiez/pluto
+```
+
+Notebooks and their databases live in the `/data` volume (a fresh volume starts with the sample notebooks).
+Always set `PLUTO_PASS` when the port is reachable by others — cells run arbitrary code.
+
+On first use of DuckDB or Polars, Pluto unpacks their engines (~210 MB) into `~/.cache/pluto`.
+
+## Run
+
+```bash
+pluto --file notebook.json
+```
+
+Open http://localhost:9999. Sample notebooks are in [`example/`](example).
 
 | Flag | |
 |---|---|

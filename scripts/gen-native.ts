@@ -1,7 +1,9 @@
 // Build step: point the native shims at whatever platform packages npm installed on this machine
 // (@duckdb/node-bindings-<platform>, nodejs-polars-<platform>). Writes src/native/platform.gen.ts and tsconfig.json.
 import { readdirSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+// posix joins: these paths end up inside generated import strings, where Windows "\\" would be an escape
+import { posix } from "node:path";
+const { join } = posix;
 
 const nm = "node_modules";
 // npm may install both glibc and musl builds on Linux, and readdir order isn't alphabetical there,

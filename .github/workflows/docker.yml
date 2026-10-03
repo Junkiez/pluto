@@ -1,0 +1,115 @@
+name: docker
+
+# Multi-arch image on GitHub Packages (ghcr.io/<owner>/pluto). Each arch builds on its own native runner
+# (emulating arm64 under QEMU would take ages for this build), then a manifest ties them together.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, platform: linux/amd64, arch: amd64 }
+          - { os: ubuntu-24.04-arm, platform: linux/arm64, arch: arm64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase image name
+        run: echo "IMAGE=${IMAGE,,}" >> "$GITHUB_ENV"
+
+      # push by digest only; the merge job adds the tags
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+
+      - name: Smoke test
+        run: |
+          docker run -d --name smoke -p 9999:9999 "$IMAGE@${{ steps.build.outputs.digest }}"
+          for i in $(seq 1 60); do curl -sf localhost:9999/api/files > /dev/null && break; sleep 1; done
+          run() {
+            out=$(curl -sf localhost:9999/api/run -d "{\"lang\":\"$1\",\"code\":\"$2\"}")
+            echo "$1: $out"
+            if [ -z "$out" ] || echo "$out" | grep -q '"error"'; then docker logs smoke; exit 1; fi
+          }
+          run ts "const n: number = 41; n + 1"
+          run sql "select 1 as pg"
+          run sqlite "select 1 as lite"
+          run duckdb "select 42 as duck"
+          run ts "pl.DataFrame({ a: [1, 2] })"
+          docker rm -f smoke
+
+      - name: Export digest
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tags
+        run: |
+          image="${IMAGE,,}"
+          version="v$(node -p 'require("./package.json").version')-${{ github.run_number }}"
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+          echo "TAGS=-t $image:latest -t $image:$version -t $image:sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Create multi-arch manifest
+        working-directory: ${{ runner.temp }}/digests
+        run: docker buildx imagetools create $TAGS $(printf "$IMAGE@sha256:%s " *)
+
+      - name: Inspect
+        run: docker buildx imagetools inspect "$IMAGE:latest"

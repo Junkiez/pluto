@@ -1,0 +1,15 @@
+node_modules
+dist
+example/pluto
+pluto
+pluto-shiki
+.git
+.github
+.idea
+**/*.pgdata
+**/*.files
+**/*.duckdb
+**/*.duckdb.wal
+**/*.sqlite
+src/native/platform.gen.ts
+tsconfig.json

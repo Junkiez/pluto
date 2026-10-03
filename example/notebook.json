@@ -2,11 +2,19 @@
   "cells": [
     {
       "lang": "ts",
-      "code": "import pl from 'nodejs-polars';\n\nconst fooSeries = pl.Series(\"foo\", [1, 2, 3])\n\nfooSeries.sum()\n",
+      "code": "const wrapper = (bars) => `\n<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    .chart { display: flex; align-items: flex-end;gap: 12px; height: 200px; padding: 20px; }\n    .bar { width: 50px; background: steelblue; color: white; text-align: center; padding-top: 4px; }\n  </style>\n</head>\n<body>\n  <div class=\"chart\">\n    ${bars}\n  </div>\n</body>\n</html>\n`;\n",
+      "result": {
+        "out": [],
+        "tables": []
+      }
+    },
+    {
+      "lang": "ts",
+      "code": "import pl from 'nodejs-polars';\n\nconst fooSeries = pl.Series(\"foo\", [1, 2, 3]);\n\nconst values = fooSeries.toArray();\n\nwrapper(\n  values.map(value => `\n      <div class=\"bar\" style=\"height: ${value * 50}px\">\n        ${value}\n      </div>\n    `).join('')\n)",
       "result": {
         "out": [],
         "tables": [],
-        "value": "6"
+        "html": "\n<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    .chart { display: flex; align-items: flex-end;gap: 12px; height: 200px; padding: 20px; }\n    .bar { width: 50px; background: steelblue; color: white; text-align: center; padding-top: 4px; }\n  </style>\n</head>\n<body>\n  <div class=\"chart\">\n    \n      <div class=\"bar\" style=\"height: 50px\">\n        1\n      </div>\n    \n      <div class=\"bar\" style=\"height: 100px\">\n        2\n      </div>\n    \n      <div class=\"bar\" style=\"height: 150px\">\n        3\n      </div>\n    \n  </div>\n</body>\n</html>\n"
       }
     },
     {
@@ -68,6 +76,110 @@
               {
                 "month": 1,
                 "diff": -66
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "lang": "ts",
+      "code": "import * as dfd from \"https://cdn.jsdelivr.net/npm/danfojs@1.1.2/lib/bundle.js\"\n\nconst df = new dfd.DataFrame({\n  name: [\"Alice\", \"Bob\", \"Charlie\", \"Diana\"],\n  age: [25, 30, 35, 28],\n  salary: [50000, 65000, 80000, 60000],\n  department: [\"IT\", \"HR\", \"IT\", \"Finance\"],\n});\n\nconst grouped = df.groupby([\"department\"]).col([\"salary\"]).mean();\ngrouped.print();\n",
+      "result": {
+        "out": [
+          "╔════════════╤═══════════════════╤═══════════════════╗\n║            │ department        │ salary_mean       ║\n╟────────────┼───────────────────┼───────────────────╢\n║ 0          │ IT                │ 65000             ║\n╟────────────┼───────────────────┼───────────────────╢\n║ 1          │ HR                │ 65000             ║\n╟────────────┼───────────────────┼───────────────────╢\n║ 2          │ Finance           │ 60000             ║\n╚════════════╧═══════════════════╧═══════════════════╝\n"
+        ],
+        "tables": []
+      }
+    },
+    {
+      "lang": "ts",
+      "code": "import * as aq from \"arquero\"\n\nconst dt = aq.table({\n  'Seattle': [69,108,178,207,253,268,312,281,221,142,72,52],\n  'Chicago': [135,136,187,215,281,311,318,283,226,193,113,106],\n  'San Francisco': [165,182,251,281,314,330,300,272,267,243,189,156]\n});\n\ndt.derive({\n    month: d => op.row_number(),\n    diff:  d => d.Seattle - d.Chicago\n  })\n  .select('month', 'diff')\n  .orderby(aq.desc('diff'))",
+      "result": {
+        "out": [],
+        "tables": [
+          {
+            "fields": [
+              "month",
+              "diff"
+            ],
+            "rows": [
+              {
+                "month": 8,
+                "diff": -2
+              },
+              {
+                "month": 9,
+                "diff": -5
+              },
+              {
+                "month": 7,
+                "diff": -6
+              },
+              {
+                "month": 4,
+                "diff": -8
+              },
+              {
+                "month": 3,
+                "diff": -9
+              },
+              {
+                "month": 2,
+                "diff": -28
+              },
+              {
+                "month": 5,
+                "diff": -28
+              },
+              {
+                "month": 11,
+                "diff": -41
+              },
+              {
+                "month": 6,
+                "diff": -43
+              },
+              {
+                "month": 10,
+                "diff": -51
+              },
+              {
+                "month": 12,
+                "diff": -54
+              },
+              {
+                "month": 1,
+                "diff": -66
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "lang": "ts",
+      "code": "import pl from \"nodejs-polars\";\n\nconst df = pl.DataFrame({\n  name: [\"Alice\", \"Bob\", \"Charlie\", \"Diana\"],\n  age: [25, 30, 35, 28],\n  salary: [50000, 65000, 80000, 60000],\n  department: [\"IT\", \"HR\", \"IT\", \"Finance\"],\n});\n\nconst grouped = df\n  .groupBy(\"department\")\n  .agg(\n    pl.col(\"salary\").mean()\n  );\n\ngrouped;\n",
+      "result": {
+        "out": [],
+        "tables": [
+          {
+            "fields": [
+              "department",
+              "salary"
+            ],
+            "rows": [
+              {
+                "department": "Finance",
+                "salary": 60000
+              },
+              {
+                "department": "HR",
+                "salary": 65000
+              },
+              {
+                "department": "IT",
+                "salary": 65000
               }
             ]
           }
