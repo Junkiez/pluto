@@ -4,9 +4,13 @@ import { readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const nm = "node_modules";
+// npm may install both glibc and musl builds on Linux, and readdir order isn't alphabetical there,
+// so choose the libc variant explicitly instead of taking the first match.
+const musl = process.platform === "linux" && existsSync("/lib") && readdirSync("/lib").some(f => f.startsWith("ld-musl-"));
 const pick = (dir: string, prefix: string) => {
-  const hit = readdirSync(dir).find(d => d.startsWith(prefix) && !d.endsWith("bindings")); // skip the JS loader package itself
-  if (!hit) throw new Error(`no ${prefix}* package in ${dir} — run npm install on this platform`);
+  const hits = readdirSync(dir).filter(d => d.startsWith(prefix) && d.includes(`${process.platform}-${process.arch}`));
+  const hit = hits.find(d => d.includes("musl") === musl);
+  if (!hit) throw new Error(`no ${prefix}${process.platform}-${process.arch}${musl ? "-musl" : ""} package in ${dir} (found: ${hits}) — run npm install on this platform`);
   return join(dir, hit);
 };
 

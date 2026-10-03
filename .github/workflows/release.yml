@@ -23,7 +23,10 @@ jobs:
           - { os: macos-15-intel, target: darwin-x64 }
           - { os: ubuntu-24.04, target: linux-x64 }
           - { os: ubuntu-24.04-arm, target: linux-arm64 }
+          # experimental: a failure here doesn't block the release (it just ships without a Windows binary)
+          - { os: windows-2022, target: win32-x64, experimental: true }
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental == true }}
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +44,8 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/smoke"
           cd "$RUNNER_TEMP/smoke"
-          PORT=8899 "$GITHUB_WORKSPACE/example/pluto" --file smoke.json > server.log 2>&1 &
+          BIN="$GITHUB_WORKSPACE/example/pluto"; [ -f "$BIN.exe" ] && BIN="$BIN.exe"
+          PORT=8899 "$BIN" --file smoke.json > server.log 2>&1 &
           for i in $(seq 1 60); do curl -sf localhost:8899/api/files > /dev/null && break; sleep 1; done
           run() {
             out=$(curl -sf localhost:8899/api/run -d "{\"lang\":\"$1\",\"code\":\"$2\"}")
@@ -53,16 +57,22 @@ jobs:
           run sqlite "select 1 as lite"
           run duckdb "select 42 as duck"
           run ts "pl.DataFrame({ a: [1, 2] })"
-          kill %1
+          run ts "await fs.writeFile('a.txt', 'x'); await fs.readFile('a.txt', 'utf8')"
+          kill %1 || true
 
       - name: Package
         shell: bash
-        run: tar -czf "pluto-${{ matrix.target }}.tar.gz" -C example pluto
+        run: |
+          if [ -f example/pluto.exe ]; then
+            (cd example && 7z a "../pluto-${{ matrix.target }}.zip" pluto.exe)
+          else
+            tar -czf "pluto-${{ matrix.target }}.tar.gz" -C example pluto
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: pluto-${{ matrix.target }}
-          path: pluto-${{ matrix.target }}.tar.gz
+          path: pluto-${{ matrix.target }}.*
           retention-days: 7
 
   release:
@@ -87,4 +97,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: Pluto ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
-          files: artifacts/*.tar.gz
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.zip

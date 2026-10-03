@@ -5,6 +5,8 @@
 A notebook in a single binary: TypeScript/JavaScript, Postgres, SQLite, DuckDB and Polars cells, a Vue UI with a
 CodeMirror editor (TypeScript completions), and an MCP endpoint for agents.
 
+![Pluto notebook: a Polars DataFrame grouped by department, rendered as a table](assets/screenshot.jpeg)
+
 ## Run
 
 Download a binary from [Releases](../../releases), or build one (below), then:

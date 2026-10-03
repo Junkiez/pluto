@@ -8,7 +8,7 @@ import realFs from "node:fs/promises";
 import { createLoopback } from "mountx";
 import { createNodeFsDriver } from "mountx/drivers/node-fs";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
-import { basename, dirname, join, resolve as resolvePath } from "node:path";
+import { basename, dirname, join, resolve as resolvePath, sep } from "node:path";
 // embedded into the binary by `bun build --compile`
 import indexHtml from "./web/index.html" with { type: "file" };
 import editorJs from "../dist/editor.js" with { type: "file" };
@@ -89,7 +89,7 @@ const duckConn = () => (duck ??= (async () => {
     // DuckDB checks relative paths against the allow-list before resolving them, so make cwd the sandbox.
     // ponytail: process-wide cwd; fine since everything else uses absolute paths in sandbox mode
     process.chdir(file + ".files");
-    const root = (resolvePath(file + ".files") + "/").replaceAll("'", "''");
+    const root = (resolvePath(file + ".files") + sep).replaceAll("'", "''");
     // order matters: allow-list and search path first, then cut external access, then lock it all
     await conn.run(`SET allowed_directories = ['${root}']; SET enable_external_access = false; SET lock_configuration = true;`);
   }
