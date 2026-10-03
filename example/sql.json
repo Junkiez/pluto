@@ -1,0 +1,34 @@
+{
+  "cells": [
+    {
+      "name": "Postgres: create",
+      "lang": "sql",
+      "code": "create table if not exists planets (name text primary key, radius_km int, moons int);\ninsert into planets values\n  ('Mercury', 2440, 0), ('Venus', 6052, 0), ('Earth', 6371, 1),\n  ('Mars', 3390, 2), ('Pluto', 1188, 5)\non conflict do nothing;\nselect * from planets order by radius_km desc;"
+    },
+    {
+      "name": "Postgres from JS",
+      "lang": "ts",
+      "code": "// sql`` runs on the same Postgres; interpolations become parameters\nconst minMoons = 1\nawait sql`select name, moons from planets where moons >= ${minMoons} order by moons desc`"
+    },
+    {
+      "name": "SQLite",
+      "lang": "sqlite",
+      "code": "create table if not exists notes (id integer primary key, body text, created text default current_timestamp);\ninsert into notes (body) values ('first note'), ('second note');\nselect * from notes order by id desc limit 5;"
+    },
+    {
+      "name": "DuckDB: write a CSV",
+      "lang": "ts",
+      "code": "await fs.writeFile(\"sales.csv\", \"region,amount\\nnorth,120\\nsouth,80\\nnorth,45\\neast,200\\nsouth,30\\n\")\n\"sales.csv written\""
+    },
+    {
+      "name": "DuckDB: query files directly",
+      "lang": "duckdb",
+      "code": "select region, sum(amount) as total, count(*) as orders\nfrom read_csv('sales.csv')\ngroup by region\norder by total desc;"
+    },
+    {
+      "name": "DuckDB from JS",
+      "lang": "ts",
+      "code": "await duck`select 'parquet, csv, json — all queryable' as tip`"
+    }
+  ]
+}

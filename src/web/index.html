@@ -1,0 +1,190 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Pluto</title>
+<link rel="icon" type="image/png" href="/logo.png">
+<meta property="og:title" content="Pluto">
+<meta property="og:description" content="Notebook for JavaScript, TypeScript and SQL">
+<meta property="og:image" content="/logo.png">
+<script src="/vue.js"></script>
+<script src="/editor.js"></script>
+<style>
+  @font-face { font-family:Geist; src:url(/geist.woff2) format("woff2"); font-weight:100 900; font-display:swap; }
+  @font-face { font-family:"Geist Mono"; src:url(/geist-mono.woff2) format("woff2"); font-weight:100 900; font-display:swap; }
+  /* theme: follows the OS unless data-theme pins it */
+  :root { color-scheme:light; --bg:#fafafa; --fg:#222; --cell:#fff; --line:#ddd; --accent:#3b6fd8; --err:#c0392b; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme:dark; --bg:#16181c; --fg:#ddd; --cell:#1f2228; --line:#333; --accent:#6c9cff; --err:#ff7b6b; } }
+  :root[data-theme="dark"] { color-scheme:dark; --bg:#16181c; --fg:#ddd; --cell:#1f2228; --line:#333; --accent:#6c9cff; --err:#ff7b6b; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px Geist, system-ui, sans-serif; }
+  header { position:sticky; top:0; background:var(--bg); border-bottom:1px solid var(--line); padding:8px 16px; display:flex; gap:8px; align-items:center; z-index:1; }
+  main { max-width:960px; margin:16px auto; padding:0 16px; }
+  .cell { background:var(--cell); border:1px solid var(--line); border-radius:6px; margin-bottom:12px; }
+  .cell.active { border-color:var(--accent); }
+  .bar { display:flex; gap:6px; padding:4px 8px; border-bottom:1px solid var(--line); align-items:center; font-size:12px; }
+  /* optional cell name: borderless, fills the bar up to the controls */
+  .bar .name { flex:1; min-width:0; border:0; outline:none; background:transparent; color:inherit; font:inherit; font-size:12px; padding:2px 4px; }
+  .bar .name::placeholder { color:var(--fg); opacity:.25; }
+  .bar .n { opacity:.5; font-family:"Geist Mono", monospace; }
+  /* editor: CodeMirror (editor.js); token colors are shiki's light/dark vars on .tk marks */
+  .ed { min-height:2.5em; }
+  .ed .tk { color:var(--shiki-light); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ed .tk { color:var(--shiki-dark); } }
+  :root[data-theme="dark"] .ed .tk { color:var(--shiki-dark); }
+  .cm-deprecated { text-decoration:line-through; opacity:.6; }
+  .cm-ts-info { padding:6px 8px; max-width:520px; font-size:12px; }
+  .cm-ts-info code { display:block; font-family:"Geist Mono", ui-monospace, monospace; white-space:pre-wrap; }
+  .cm-ts-info p { margin:6px 0 0; opacity:.8; white-space:pre-wrap; }
+  .out { border-top:1px solid var(--line); padding:8px 10px; font:12px/1.5 "Geist Mono", ui-monospace, monospace; white-space:pre-wrap; overflow:auto; max-height:400px; }
+  .out:has(iframe) { max-height:none; }
+  iframe.html { display:block; width:100%; height:40px; border:0; background:#fff; border-radius:4px; }
+  .err { color:var(--err); }
+  table { border-collapse:collapse; margin:4px 0; }
+  td, th { border:1px solid var(--line); padding:2px 8px; text-align:left; }
+  button, select { font:inherit; font-size:12px; background:var(--cell); color:inherit; border:1px solid var(--line); border-radius:4px; padding:2px 8px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <img src="/logo.png" alt="" width="22" height="22">
+    <b>Pluto</b>
+    <select :value="current" @change="pick($event)" title="Notebook">
+      <option v-for="f in files" :value="f">{{ f }}</option>
+      <hr>
+      <option value="__new">+ New notebook…</option>
+    </select>
+    <span style="margin-right:auto"></span>
+    <span v-if="dirty" style="opacity:.6">unsaved</span>
+    <button @click="save">Save ⌘S</button>
+    <button @click="runAll">Run all</button>
+    <button @click="restart">Restart kernel</button>
+    <select v-model="editorTheme" title="Editor theme">
+      <option v-for="(t, k) in editorThemes" :value="k">{{ t.label }}</option>
+    </select>
+    <select v-model="theme" title="Theme"><option value="">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
+  </header>
+  <main>
+    <div v-for="(c, i) in cells" :key="c.id" class="cell" :class="{ active: active === i }" @focusin="active = i">
+      <div class="bar">
+        <span class="n">[{{ c.running ? '*' : (c.count ?? ' ') }}]</span>
+        <input class="name" v-model="c.name" :placeholder="`Block ${i + 1}`" spellcheck="false" aria-label="Cell name">
+        <select v-model="c.lang"><option value="ts">TypeScript</option><option value="js">JavaScript</option><option value="sql">Postgres</option><option value="sqlite">SQLite</option><option value="duckdb">DuckDB</option><option value="polars">Polars</option></select>
+        <button @click="run(c)">▶</button>
+        <button @click="move(i, -1)">↑</button>
+        <button @click="move(i, 1)">↓</button>
+        <button @click="add(i + 1)">+</button>
+        <button @click="cells.splice(i, 1)">✕</button>
+      </div>
+      <cm-editor class="ed" :cell="c" :index="i" :cells="cells"
+        @run="run(c)" @run-next="run(c).then(() => focus(i + 1))"></cm-editor>
+      <div v-if="c.result" class="out">
+        <div v-for="l in c.result.out">{{ l }}</div>
+        <div v-if="c.result.value !== undefined">{{ c.result.value }}</div>
+        <!-- sandboxed: cell HTML may run scripts but can't touch the app; it reports its height back -->
+        <iframe v-if="c.result.html" class="html" sandbox="allow-scripts" :srcdoc="frame(c)"></iframe>
+        <table v-for="t in c.result.tables || []">
+          <tr><th v-for="f in t.fields">{{ f }}</th></tr>
+          <tr v-for="r in t.rows"><td v-for="f in t.fields">{{ r[f] }}</td></tr>
+        </table>
+        <div v-if="c.result.error" class="err">{{ c.result.error }}</div>
+      </div>
+    </div>
+    <button @click="add(cells.length)">+ Cell</button>
+  </main>
+</div>
+<script>
+const { createApp, nextTick } = Vue;
+let seq = 0, count = 0;
+// per-viewer preference; storage may be unavailable (private mode)
+const store = (k, v) => { try { return v === undefined ? localStorage.getItem(k) : localStorage.setItem(k, v); } catch {} };
+const api = (path, body, method = "POST") =>
+  fetch(path, { method, body: body && JSON.stringify(body) }).then(r => r.json());
+
+// CodeMirror cell editor (editor.js). Holds the view; syncs code out, and in when changed from outside (e.g. reload).
+const CmEditor = {
+  props: ["cell", "index", "cells"],
+  emits: ["run", "run-next"],
+  template: "<div></div>",
+  mounted() {
+    this.ed = window.createEditor(this.$el, {
+      doc: this.cell.code, lang: this.cell.lang,
+      onChange: code => { this.cell.code = code; },
+      onRun: () => this.$emit("run"),
+      onRunNext: () => this.$emit("run-next"),
+      ctx: () => ({ cells: this.cells.map(({ lang, code }) => ({ lang, code })), index: this.index }),
+    });
+  },
+  unmounted() { this.ed.destroy(); },
+  watch: {
+    "cell.lang"(l) { this.ed.setLang(l); },
+    "cell.code"(code) {
+      const v = this.ed.view;
+      if (code !== v.state.doc.toString()) v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: code } });
+    },
+  },
+};
+
+createApp({
+  data: () => ({ cells: [], active: 0, dirty: false, files: [], current: "", theme: store("theme") ?? "", editorTheme: store("editorTheme") ?? "catppuccin", editorThemes: window.editorThemes }),
+
+  watch: {
+    editorTheme: { immediate: true, handler(t) { store("editorTheme", t); window.setEditorTheme(t); } },
+    theme: { immediate: true, handler(t) { document.documentElement.dataset.theme = t; store("theme", t); } },
+    cells: { deep: true, handler() { this.dirty = true; } },
+  },
+  async mounted() {
+    await this.load();
+    addEventListener("message", e => {
+      const i = this.cells.findIndex(c => c.id === e.data?.pluto);
+      const f = document.querySelectorAll(".cell")[i]?.querySelector("iframe.html");
+      if (f && e.source === f.contentWindow) f.style.height = Math.min(e.data.h, 2000) + "px";
+    });
+    addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); this.save(); } });
+  },
+  methods: {
+    async load() {
+      const [nb, f] = await Promise.all([api("/api/notebook", null, "GET"), api("/api/files", null, "GET")]);
+      Object.assign(this, f);
+      count = 0;
+      this.cells = nb.cells.map(c => ({ ...c, id: seq++ }));
+      document.title = `${f.current} · Pluto`;
+      await nextTick();
+      this.dirty = false;
+    },
+    async pick(e) {
+      let name = e.target.value;
+      e.target.value = this.current; // stay put until the switch actually happens
+      if (name === "__new") name = prompt("New notebook name", "untitled.json");
+      if (!name || name === this.current) return;
+      if (this.dirty && !confirm(`Discard unsaved changes to ${this.current}?`)) return;
+      await api("/api/open", { name });
+      await this.load();
+    },
+    frame(c) {
+      const id = c.id;
+      return `<style>html{overflow:hidden}</style>` + c.result.html + `<script>new ResizeObserver(() => parent.postMessage({ pluto: ${id}, h: document.documentElement.scrollHeight }, "*")).observe(document.documentElement)<\/script>`;
+    },
+    async run(c) {
+      c.running = true;
+      c.result = await api("/api/run", { code: c.code, lang: c.lang }).catch(e => ({ out: [], error: String(e) }));
+      c.running = false;
+      c.count = ++count;
+    },
+    async runAll() { for (const c of this.cells) await this.run(c); },
+    async restart() { await api("/api/restart"); count = 0; this.cells.forEach(c => { c.result = null; c.count = null; }); },
+    async save() {
+      await api("/api/notebook", { cells: this.cells.map(({ name, lang, code, result }) => ({ ...(name ? { name } : {}), lang, code, result })) }, "PUT");
+      this.dirty = false;
+    },
+    add(i) { this.cells.splice(i, 0, { id: seq++, lang: this.cells[i - 1]?.lang ?? "ts", code: "" }); this.focus(i); },
+    move(i, d) { const j = i + d; if (j < 0 || j >= this.cells.length) return; this.cells.splice(j, 0, this.cells.splice(i, 1)[0]); },
+    focus(i) {
+      if (i >= this.cells.length) this.add(i);
+      nextTick(() => document.querySelectorAll(".cell .cm-content")[i]?.focus());
+    },
+  },
+}).component("cm-editor", CmEditor).mount("#app");
+</script>
+</body>
+</html>

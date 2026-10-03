@@ -1,0 +1,33 @@
+{
+  "name": "pluto",
+  "version": "0.1.0",
+  "description": "Notebook for JS/TS, Postgres, SQLite, DuckDB and Polars in a single binary",
+  "scripts": {
+    "build": "npm run gen && npm run build:web && bun build src/server.ts --compile --minify --outfile example/pluto",
+    "dev": "npm run gen && npm run build:web && bun src/server.ts --file example/notebook.json",
+    "gen": "bun scripts/gen-types.ts && bun scripts/gen-native.ts",
+    "build:web": "bun build src/web/editor.ts src/web/ts-worker.ts --target browser --format iife --minify --outdir dist"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-sql": "^6.10.0",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.13",
+    "@duckdb/node-api": "^1.5.6-r.1",
+    "@electric-sql/pglite": "^0.5.8",
+    "@swc/wasm": "^1.16.13",
+    "bun": "^1.4.2",
+    "edge-runtime": "^4.0.1",
+    "geist": "^1.7.2",
+    "mountx": "^0.0.2",
+    "nodejs-polars": "^0.26.1",
+    "shiki": "^4.5.0",
+    "typescript": "^5.9.3",
+    "vue": "^3.5.43"
+  },
+  "private": "true"
+}

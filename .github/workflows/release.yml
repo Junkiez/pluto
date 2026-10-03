@@ -1,0 +1,90 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # native runners: DuckDB/Polars ship per-platform .node files, so each binary is built on its own platform
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14, target: darwin-arm64 }
+          - { os: macos-15-intel, target: darwin-x64 }
+          - { os: ubuntu-24.04, target: linux-x64 }
+          - { os: ubuntu-24.04-arm, target: linux-arm64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/smoke"
+          cd "$RUNNER_TEMP/smoke"
+          PORT=8899 "$GITHUB_WORKSPACE/example/pluto" --file smoke.json > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:8899/api/files > /dev/null && break; sleep 1; done
+          run() {
+            out=$(curl -sf localhost:8899/api/run -d "{\"lang\":\"$1\",\"code\":\"$2\"}")
+            echo "$1: $out"
+            if echo "$out" | grep -q '"error"'; then cat server.log; exit 1; fi
+          }
+          run ts "const n: number = 41; n + 1"
+          run sql "select 1 as pg"
+          run sqlite "select 1 as lite"
+          run duckdb "select 42 as duck"
+          run ts "pl.DataFrame({ a: [1, 2] })"
+          kill %1
+
+      - name: Package
+        shell: bash
+        run: tar -czf "pluto-${{ matrix.target }}.tar.gz" -C example pluto
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pluto-${{ matrix.target }}
+          path: pluto-${{ matrix.target }}.tar.gz
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Tag
+        id: tag
+        shell: bash
+        run: echo "tag=v$(node -p 'require("./package.json").version')-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Pluto ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: artifacts/*.tar.gz

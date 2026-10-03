@@ -1,0 +1,12 @@
+node_modules
+dist
+.idea
+src/native/platform.gen.ts
+tsconfig.json
+example/pluto
+pluto
+*.pgdata
+*.files
+*.duckdb
+*.duckdb.wal
+*.sqlite

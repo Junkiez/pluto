@@ -1,0 +1,29 @@
+{
+  "cells": [
+    {
+      "name": "Polars DataFrame",
+      "lang": "ts",
+      "code": "// pl is built in (native Polars); DataFrames render as tables\nconst cities = pl.DataFrame({\n  city: [\"Tokyo\", \"Delhi\", \"Shanghai\", \"Tokyo\", \"Delhi\"],\n  year: [2020, 2020, 2020, 2021, 2021],\n  pop_m: [37.4, 30.3, 27.1, 37.3, 31.2],\n})\ncities"
+    },
+    {
+      "name": "Polars expressions",
+      "lang": "ts",
+      "code": "cities\n  .groupBy(\"city\")\n  .agg(pl.col(\"pop_m\").mean().alias(\"avg_pop_m\"))\n  .sort(\"avg_pop_m\", true)"
+    },
+    {
+      "name": "Polars SQL",
+      "lang": "polars",
+      "code": "-- Polars cells query DataFrames from the JS kernel by variable name\nselect city, max(pop_m) as peak\nfrom cities\ngroup by city\norder by peak desc"
+    },
+    {
+      "name": "Series",
+      "lang": "ts",
+      "code": "pl.Series(\"squares\", [1, 2, 3, 4].map(n => n * n))"
+    },
+    {
+      "name": "arquero",
+      "lang": "ts",
+      "code": "import * as aq from \"arquero\"\n\naq.table({ a: [1, 2, 3], b: [\"x\", \"y\", \"z\"] })\n  .derive({ a2: d => d.a * 2 })"
+    }
+  ]
+}

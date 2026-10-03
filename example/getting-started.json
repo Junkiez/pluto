@@ -1,0 +1,39 @@
+{
+  "cells": [
+    {
+      "name": "Hello",
+      "lang": "ts",
+      "code": "// Cells share one kernel: top-level bindings carry over to later cells.\nconst greeting: string = \"Hello from Pluto\"\ngreeting.toUpperCase()"
+    },
+    {
+      "name": "Reuse across cells",
+      "lang": "ts",
+      "code": "greeting.split(\" \").length"
+    },
+    {
+      "name": "URL imports",
+      "lang": "ts",
+      "code": "// Bare names resolve to esm.sh; full URLs work too (allowed hosts: --allow-import)\nimport _ from \"lodash\"\n\n_.chunk([1, 2, 3, 4, 5, 6], 2)"
+    },
+    {
+      "name": "Top-level await",
+      "lang": "js",
+      "code": "const res = await Promise.resolve({ ok: true, at: new Date().toISOString() })\nres"
+    },
+    {
+      "name": "HTML output",
+      "lang": "js",
+      "code": "// Return an HTML string (or a text/html Response) to render it\n`<div style=\"font-family:system-ui;padding:12px;border-radius:8px;background:linear-gradient(90deg,#8b5cf6,#ec4899);color:white\">\n  <b>Rendered HTML</b> — ${new Date().toLocaleDateString()}\n</div>`"
+    },
+    {
+      "name": "console.table",
+      "lang": "js",
+      "code": "console.table([{ planet: \"Pluto\", moons: 5 }, { planet: \"Charon\", moons: 0 }])"
+    },
+    {
+      "name": "Sandboxed fs",
+      "lang": "ts",
+      "code": "// fs is jailed to <notebook>.files/ unless started with --unsafe\nawait fs.writeFile(\"hello.txt\", \"hi from a cell\")\nawait fs.readFile(\"hello.txt\", \"utf8\")"
+    }
+  ]
+}
